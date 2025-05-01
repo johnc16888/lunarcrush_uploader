@@ -1,0 +1,8 @@
+beautifulsoup4
+pandas
+openpyxl
+google-api-python-client
+google-auth
+google-auth-oauthlib
+requests
+playwright
