@@ -1,18 +1,27 @@
-import pandas as pd
-from datetime import datetime
 import os
+import pandas as pd
 
-def save_to_excel(tokens):
-    df = pd.DataFrame(tokens)
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    folder = "./data/excel"
-    os.makedirs(folder, exist_ok=True)
-    path = os.path.join(folder, f"filtered_lunarcrush_{timestamp}.xlsx")
-    df.to_excel(path, index=False)
+def save_to_excel(coins, now):
+    if not coins:
+        print("[INFO] 没有代币数据需要保存")
+        return None
 
-    def parse_number(s):
-        s = s.replace(",", "").replace("K", "e3").replace("M", "e6")
-        return int(float(s))
+    # 构建多层目录结构：./data/excel/YYYY/MM/DD/HH/
+    year = now.strftime("%Y")
+    month = now.strftime("%m")
+    day = now.strftime("%d")
+    hour = now.strftime("%H")
 
-    filtered = [t for t in tokens if int(t["AltRank"]) <= 50 and parse_number(t["Engagement"]) > 1_000_000]
-    return path, filtered
+    folder_path = os.path.join("data", "excel", year, month, day, hour)
+    os.makedirs(folder_path, exist_ok=True)
+
+    # 文件名：filtered_lunarcrush_YYYY-MM-DD_HH-MM.xlsx
+    filename = f"filtered_lunarcrush_{now.strftime('%Y-%m-%d_%H-%M')}.xlsx"
+    file_path = os.path.join(folder_path, filename)
+
+    # 保存为 Excel
+    df = pd.DataFrame(coins)
+    df.to_excel(file_path, index=False)
+
+    print(f"[INFO] Excel 已保存到: {file_path}")
+    return file_path
