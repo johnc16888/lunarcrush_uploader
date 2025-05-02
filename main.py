@@ -1,47 +1,37 @@
+# main.py
+
 import os
-import datetime
-import pandas as pd
+from datetime import datetime
 from html_parser import extract_coin_data
 from excel_exporter import save_to_excel
 from drive_uploader import upload_to_drive
 from telegram_notifier import send_telegram_alert
 
-
 def main():
     print("[INFO] 开始执行 LunarCrush 数据处理流程")
 
-    # 创建时间戳用于保存和标识
-    now = datetime.datetime.now()
-    date_str = now.strftime("%Y-%m-%d")
-    time_str = now.strftime("%H-%M")
+    # STEP 1: 读取 HTML 内容
+    try:
+        with open("sample_lunarcrush.html", "r", encoding="utf-8") as f:
+            html = f.read()
+    except FileNotFoundError:
+        print("❌ 错误: 找不到 sample_lunarcrush.html 文件")
+        return
 
-    # 解析 HTML 提取数据
-    coins = extract_coin_data()
+    # STEP 2: 提取代币数据
+    coins = extract_coin_data(html)
     print(f"[INFO] 共提取代币数量: {len(coins)}")
 
-    # 保存为 Excel 文件（按年月/日/小时）
-    excel_path = save_to_excel(coins, date_str, time_str)
+    # STEP 3: 写入 Excel 文件
+    now = datetime.utcnow()
+    excel_path = save_to_excel(coins, now)
     print(f"[INFO] Excel 已保存到: {excel_path}")
 
-    # 上传到 Google Drive（可选）
-    try:
-        drive_url = upload_to_drive(excel_path)
-        print(f"[INFO] 已上传至 Google Drive: {drive_url}")
-    except Exception as e:
-        print(f"[WARNING] 上传至 Google Drive 失败: {e}")
-        drive_url = None
+    # STEP 4: 上传到 Google Drive
+    drive_url = upload_to_drive(excel_path)
 
-    # 过滤满足推送条件的币种
-    filtered = [c for c in coins if c.get("AltRank") and int(c["AltRank"]) <= 50 and \
-                c.get("Engagement") and c.get("Engagement_Change") and \
-                int(str(c["Engagement"]).replace(",", "")) > 1_000_000]
-
-    # 发送 Telegram 推送
-    if filtered:
-        send_telegram_alert(filtered, date_str, time_str, excel_path, drive_url)
-    else:
-        send_telegram_alert([], date_str, time_str, excel_path, drive_url)
-
+    # STEP 5: Telegram 推送符合条件的代币
+    send_telegram_alert(coins, drive_url)
 
 if __name__ == "__main__":
     main()
