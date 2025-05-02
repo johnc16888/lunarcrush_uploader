@@ -1,32 +1,36 @@
-import os
+# run_all.py
+
 import subprocess
+import os
+from html_checker import is_valid_lunarcrush_html
 
-# Step 1: Use Playwright to fetch the latest HTML
-def run_playwright_scraper():
-    print("\n\U0001F680 [STEP 1] 自动刷新并抓取 LunarCrush 页面...")
+def step(title):
+    print(f"\n🚀 [STEP] {title}...")
+
+def run_command(script):
     try:
-        subprocess.run(["python", "playwright_scraper.py"], check=True)
+        subprocess.run(["python", script], check=True)
     except subprocess.CalledProcessError as e:
-        print("\u274c Playwright 执行失败:", e)
+        print(f"❌ 执行 {script} 失败:", e)
 
-# Step 2: Check the HTML structure
-def run_html_checker():
-    print("\U0001F50D [STEP 2] 检查抓取 HTML 文件结构...")
-    try:
-        subprocess.run(["python", "html_checker.py"], check=True)
-    except subprocess.CalledProcessError as e:
-        print("\u274c HTML 检查失败:", e)
+if __name__ == "__main__":
+    # STEP 1: Playwright 抓取网页
+    step("自动刷新并抓取 LunarCrush 页面")
+    result = subprocess.run(["python", "playwright_scraper.py"])
+    if result.returncode != 0:
+        print("❌ Playwright 执行失败: ", result)
 
-# Step 3: Main pipeline - parse + Excel + Drive + Telegram
-def run_main():
-    print("\U0001F4CA [STEP 3] 运行主流程提取 + Excel + Drive + Telegram...")
+    # STEP 2: 检查 HTML 文件结构
+    step("检查抓取 HTML 文件结构")
+    valid = is_valid_lunarcrush_html()
+    if not valid:
+        print("⚠️ 页面结构异常，继续执行主流程（将尝试提取可能的内容）")
+
+    # STEP 3: 主流程：提取数据 + 存 Excel + 上传 Drive + 推送 Telegram
+    step("运行主流程提取 + Excel + Drive + Telegram")
     try:
         subprocess.run(["python", "main.py"], check=True)
     except subprocess.CalledProcessError as e:
-        print("\u274c 主流程执行失败:", e)
+        print(f"❌ 主流程执行失败: {e}")
 
-if __name__ == "__main__":
-    run_playwright_scraper()
-    run_html_checker()
-    run_main()
-    print("\u2705 所有步骤执行完成。")
+    print("✅ 所有步骤执行完成。")
