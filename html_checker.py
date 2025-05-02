@@ -1,10 +1,9 @@
 # html_checker.py
 
-def is_valid_html(html_content: str) -> bool:
-    """
-    简单检查 HTML 页面中是否包含 LunarCrush 的代币卡片结构。
-    可根据 'data-testid="coin-card"' 等特征进行判断。
-    """
-    if not html_content:
-        return False
-    return "coin-card" in html_content or "data-testid=\"coin-card\"" in html_content
+from bs4 import BeautifulSoup
+
+def is_valid_lunarcrush_html(html: str) -> bool:
+    """检查 HTML 是否包含有效的 LunarCrush 代币卡片结构"""
+    soup = BeautifulSoup(html, "html.parser")
+    # 查找是否至少存在一个卡片结构
+    return soup.find("div", {"data-testid": "coin-card"}) is not None
