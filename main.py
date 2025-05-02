@@ -1,49 +1,43 @@
+# telegram_notifier.py
+
 import os
-from datetime import datetime
-from html_parser import extract_coin_data
-from excel_exporter import save_to_excel
-from telegram_notifier import send_telegram_alert
-from drive_uploader import upload_to_drive
-from playwright_scraper import save_lunarcrush_html
+import requests
 
-def main():
-    now = datetime.utcnow()
-    print("✅ 已成功写入 credentials.json")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-    print("🚀 [STEP 1] 自动刷新并抓取 LunarCrush 页面...")
-    save_lunarcrush_html()
-
-    print("🔍 [STEP 2] 检查抓取 HTML 文件结构...")
-    try:
-        with open("sample_lunarcrush.html", "r", encoding="utf-8") as f:
-            html = f.read()
-    except FileNotFoundError:
-        print("❌ 找不到 sample_lunarcrush.html 文件")
+def send_telegram_alert(coins, excel_path=None):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("⚠️ Telegram 配置未设置")
         return
 
-    coins = extract_coin_data(html)
-    print(f"[INFO] 共提取代币数量: {len(coins)}")
-
     if not coins:
-        print("[INFO] 没有代币数据需要保存")
-        excel_path = None
+        message = "📭 本轮没有符合条件的代币"
     else:
-        excel_path = save_to_excel(coins, now)
-        print(f"[INFO] Excel 已保存到: {excel_path}")
+        message = f"📈 本轮筛选出 {len(coins)} 个代币：\n\n"
+        for i, coin in enumerate(coins, 1):
+            message += (
+                f"{i}. ${coin['symbol']} - {coin['name']}\n"
+                f"📊 AltRank: {coin.get('altrank', 'N/A')} | Engagement: {coin.get('engagement_value', 'N/A')} ({coin.get('engagement_change', 'N/A')}%)\n"
+                f"💬 Mentions: {coin.get('mention_value', 'N/A')} ({coin.get('mention_change', 'N/A')}%)\n"
+                f"📈 Price Change: {coin.get('price_change', 'N/A')}%\n\n"
+            )
 
-    # 🧪 调试环境变量
-    print("[DEBUG] 是否设置 GOOGLE_SERVICE_ACCOUNT_JSON:", "GOOGLE_SERVICE_ACCOUNT_JSON" in os.environ)
+    # 发送文本消息
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message,
+        "parse_mode": "HTML",
+    }
+    response = requests.post(url, json=payload)
+    print(f"[Telegram] 消息发送状态: {response.status_code}")
 
-    # 上传到 Google Drive（可选）
-    if excel_path:
-        try:
-            drive_url = upload_to_drive(excel_path)
-            print(f"[INFO] 文件上传成功: {drive_url}")
-        except Exception as e:
-            print(f"[ERROR] 上传到 Google Drive 出错: {e}")
-
-    # 推送 Telegram（只推送满足条件的代币）
-    send_telegram_alert(coins, excel_path)
-
-if __name__ == "__main__":
-    main()
+    # 如果指定了 Excel 文件路径，则上传
+    if excel_path and os.path.exists(excel_path):
+        with open(excel_path, "rb") as file:
+            files = {"document": file}
+            data = {"chat_id": TELEGRAM_CHAT_ID}
+            file_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
+            r = requests.post(file_url, data=data, files=files)
+            print(f"[Telegram] Excel 文件发送状态: {r.status_code}")
