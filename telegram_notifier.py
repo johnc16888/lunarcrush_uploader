@@ -3,41 +3,36 @@
 import os
 import requests
 
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
-def send_telegram_alert(coins, excel_path=None):
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print("⚠️ Telegram 配置未设置")
+def send_telegram_alert(coins: list, excel_path: str):
+    TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+    TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        print("❌ 缺少 Telegram 环境变量")
         return
 
     if not coins:
-        message = "📭 本轮没有符合条件的代币"
+        text = "⚠️ 本轮无符合条件的代币，未触发推送。"
     else:
-        message = f"📈 本轮筛选出 {len(coins)} 个代币：\n\n"
-        for i, coin in enumerate(coins, 1):
-            message += (
-                f"{i}. ${coin['symbol']} - {coin['name']}\n"
-                f"📊 AltRank: {coin.get('altrank', 'N/A')} | Engagement: {coin.get('engagement_value', 'N/A')} ({coin.get('engagement_change', 'N/A')}%)\n"
-                f"💬 Mentions: {coin.get('mention_value', 'N/A')} ({coin.get('mention_change', 'N/A')}%)\n"
-                f"📈 Price Change: {coin.get('price_change', 'N/A')}%\n\n"
-            )
+        lines = ["📊 符合条件的代币（部分字段）：\n"]
+        for i, coin in enumerate(coins, start=1):
+            lines.append(f"{i}. {coin['symbol']} - {coin['name']}")
+            lines.append(f"   AltRank: #{coin.get('altrank')}, Engagement: {coin.get('engagement')} ({coin.get('engagement_change')})")
+            lines.append(f"   Mentions: {coin.get('mentions')} ({coin.get('mentions_change')}), 24h价格变化: {coin.get('price_change')}")
+        text = "\n".join(lines)
 
     # 发送文本消息
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": message,
-        "parse_mode": "HTML",
-    }
-    response = requests.post(url, json=payload)
-    print(f"[Telegram] 消息发送状态: {response.status_code}")
+    resp = requests.post(
+        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+        json={"chat_id": TELEGRAM_CHAT_ID, "text": text}
+    )
+    print(f"[INFO] 推送状态: {resp.status_code}")
 
-    # 如果指定了 Excel 文件路径，则上传
+    # 上传 Excel 文件（如果有）
     if excel_path and os.path.exists(excel_path):
-        with open(excel_path, "rb") as file:
-            files = {"document": file}
-            data = {"chat_id": TELEGRAM_CHAT_ID}
-            file_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
-            r = requests.post(file_url, data=data, files=files)
-            print(f"[Telegram] Excel 文件发送状态: {r.status_code}")
+        with open(excel_path, "rb") as f:
+            resp = requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendDocument",
+                data={"chat_id": TELEGRAM_CHAT_ID},
+                files={"document": f}
+            )
+            print(f"[INFO] Excel 文件上传状态: {resp.status_code}")
