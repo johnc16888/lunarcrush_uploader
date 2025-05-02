@@ -1,39 +1,49 @@
 from bs4 import BeautifulSoup
 
+
 def extract_coin_data(html):
     soup = BeautifulSoup(html, "html.parser")
-    cards = soup.find_all("a", href=True)
+    cards = soup.find_all("div", class_="chakra-card")
 
     coins = []
     for card in cards:
         try:
-            name = card.select_one('[data-testid^="marketRowName_"] div[dir="auto"]:first-child').text.strip()
-            symbol = card.select_one('[data-testid^="marketRowName_"] div[dir="auto"]:nth-child(2)').text.strip()
+            name = card.find("div", class_="css-15c1g3n").text.strip()
+            symbol = card.find("div", class_="css-1r7ky0e").text.strip()
+            price = card.find("div", class_="css-1j8o68f").text.strip()
+            price_change = card.find("div", class_="css-1b7nvhl").text.strip()
+            alt_rank = card.find("div", class_="css-1lkkvye").text.strip()
 
-            price_div = card.find_all("div", string=lambda t: t and "$" in t)
-            price = price_div[0].text.strip() if price_div else ""
+            mentions_raw = card.find("div", string="Mentions").find_next("div").text.strip()
+            mention_change_raw = card.find("div", string="Mentions").find_next("div").find_next("div").text.strip()
 
-            percent_changes = card.find_all("div", style=lambda s: s and "color" in s)
-            price_change = percent_changes[0].text.strip() if len(percent_changes) > 0 else ""
-            engagement_change = percent_changes[1].text.strip() if len(percent_changes) > 1 else ""
-            altrank_change = percent_changes[2].text.strip() if len(percent_changes) > 2 else ""
+            engagement_raw = card.find("div", string="Engagement").find_next("div").text.strip()
+            engagement_change_raw = card.find("div", string="Engagement").find_next("div").find_next("div").text.strip()
 
-            raw_texts = [div.text.strip().replace(",", "").replace("↑", "").replace("↓", "")
-                         for div in card.find_all("div") if div.text.strip().replace(",", "").replace(".", "").replace("↑", "").replace("↓", "").isdigit()]
+            def convert_abbreviated_number(num_str):
+                num_str = num_str.replace(",", "")
+                if "K" in num_str:
+                    return int(float(num_str.replace("K", "")) * 1_000)
+                elif "M" in num_str:
+                    return int(float(num_str.replace("M", "")) * 1_000_000)
+                elif "B" in num_str:
+                    return int(float(num_str.replace("B", "")) * 1_000_000_000)
+                return int(float(num_str))
 
-            engagement = raw_texts[-5] if len(raw_texts) >= 5 else ""
-            mentions = raw_texts[-1] if len(raw_texts) >= 1 else ""
-
-            coins.append({
+            coin = {
                 "Name": name,
                 "Symbol": symbol,
                 "Price": price,
                 "Price_Change": price_change,
-                "AltRank_Change": altrank_change,
-                "Engagement": engagement,
-                "Engagement_Change": engagement_change,
-                "Mentions": mentions
-            })
-        except Exception:
-            continue
+                "AltRank": int(alt_rank.replace("#", "")),
+                "Mentions": convert_abbreviated_number(mentions_raw),
+                "Mentions_Change": mention_change_raw,
+                "Engagement": convert_abbreviated_number(engagement_raw),
+                "Engagement_Change": engagement_change_raw
+            }
+
+            coins.append(coin)
+        except Exception as e:
+            print(f"❌ 跳过异常卡片: {e}")
+
     return coins
